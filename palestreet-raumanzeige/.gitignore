@@ -1,0 +1,13 @@
+# Python (nur für lokalen Build nötig – nicht ins Repo/deployen)
+.venv/
+firmware/.venv/
+firmware/__pycache__/
+**/__pycache__/
+build_firmware/
+
+# Lokale Firmware-Config (WLAN/Passwort) – nur config.example.h committen
+firmware/config.h
+
+# macOS
+.DS_Store
+**/.DS_Store
