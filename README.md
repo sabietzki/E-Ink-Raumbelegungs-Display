@@ -1,8 +1,8 @@
 # E-Ink Raumanzeige · reTerminal E1001
 
-**Version 1.0** · Raumbelegungsplan für das **reTerminal E1001** (7,5″ E-Paper, ESP32-S3). Belegungsstatus und nächste Termine aus **ICS-Kalender** (z. B. Google), Konfiguration über **WordPress**. Display aktualisiert nur bei geändertem Inhalt (Hash-Vergleich) – spart Akku.
+**Version 1.0.1** · Raumbelegungsplan für das **reTerminal E1001** (7,5″ E-Paper, ESP32-S3). Belegungsstatus und nächste Termine aus **ICS-Kalender** (z. B. Google), Konfiguration über **WordPress**. Display aktualisiert nur bei geändertem Inhalt (Hash-Vergleich) – spart Akku.
 
-**Hardware:** [reTerminal E1001 bei Seeed Studio](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html?sensecap_affiliate=VcrMFpJ&referring_service=link) · [Zubehör Festverkabelung Stromversorgung (Amazon)](https://amzn.to/4tcCDFr)
+**Hardware:** [reTerminal E1001 bei Seeed Studio](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html?sensecap_affiliate=VcrMFpJ&referring_service=link) · [Zubehör Festverkabelung Stromversorgung (Amazon)](https://amzn.to/3Onrnps)
 
 ![E-Ink Raumanzeige – reTerminal E1001 mit Belegung, nächsten Terminen und QR-Code](images/display-preview.jpg)
 
@@ -137,4 +137,4 @@ GPL v2 or later. Siehe [License](https://www.gnu.org/licenses/gpl-2.0.html).
 
 ---
 
-**Version 1.0** – für reTerminal E1001 (XIAO ESP32S3). Getestet mit WordPress, ICS (Google Kalender). Für 1.1 sind Erweiterungen geplant.
+**Version 1.0.1** – für reTerminal E1001 (XIAO ESP32S3). Getestet mit WordPress, ICS (Google Kalender). Für 1.1 sind Erweiterungen geplant.

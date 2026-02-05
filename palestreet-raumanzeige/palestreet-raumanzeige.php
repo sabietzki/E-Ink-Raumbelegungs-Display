@@ -3,7 +3,7 @@
  * Plugin Name: E-Ink Raumbelegungsplan
  * Plugin URI: https://github.com/sabietzki/
  * Description: Backend für E-Paper-Raumbelegungsplan-Schilder (z. B. reTerminal E1001). ICS-Kalender-Anbindung, REST API für Displays, pro Schild: Zeitzone, Update-Intervall, Nachtmodus, WLAN. Display aktualisiert nur bei geändertem Inhalt (Hash-Vergleich).
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Lars Sabietzki
  * Author URI: https://sabietzki.de
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('PALESTREET_RAUMANZEIGE_VERSION', '1.0.0');
+define('PALESTREET_RAUMANZEIGE_VERSION', '1.0.1');
 
 require_once plugin_dir_path(__FILE__) . 'includes/class-ics-parser.php';
 
@@ -642,21 +642,28 @@ function palestreet_raumanzeige_options_page() {
     $icons_base_url     = plugin_dir_url(__FILE__) . 'firmware/data/';
     ?>
     <style>
-    .raumanzeige-resources-table { table-layout: fixed; }
-    .raumanzeige-resources-table .col-id { width: 44px; }
-    .raumanzeige-resources-table .col-name { width: 140px; }
-    .raumanzeige-resources-table .col-ics { width: 180px; }
-    .raumanzeige-resources-table .col-qr { width: 140px; }
-    .raumanzeige-resources-table .col-wifi { width: 100px; }
-    .raumanzeige-resources-table .col-wifi-pass { width: 90px; }
-    .raumanzeige-resources-table .col-tz { width: 110px; }
-    .raumanzeige-resources-table .col-interval { width: 75px; }
-    .raumanzeige-resources-table .col-night-from { width: 70px; }
-    .raumanzeige-resources-table .col-night-to { width: 70px; }
-    .raumanzeige-resources-table .col-template { width: 90px; }
-    .raumanzeige-resources-table .col-debug { width: 52px; }
-    .raumanzeige-resources-table .col-actions { width: 180px; }
-    .raumanzeige-resources-table .col-actions .button { margin: 0 2px 2px 0; }
+    .raumanzeige-resources-accordion { max-width: 100%; margin: 12px 0; }
+    .raumanzeige-resources-accordion details { margin-bottom: 8px; border: 1px solid #c3c4c7; border-radius: 4px; background: #fff; }
+    .raumanzeige-resources-accordion details[open] { border-color: #2271b1; box-shadow: 0 0 0 1px #2271b1; }
+    .raumanzeige-resources-accordion summary { padding: 12px 16px; cursor: pointer; font-weight: 600; list-style: none; display: flex; align-items: center; justify-content: space-between; }
+    .raumanzeige-resources-accordion summary::-webkit-details-marker { display: none; }
+    .raumanzeige-resources-accordion summary::before { content: "▸ "; color: #2271b1; margin-right: 8px; }
+    .raumanzeige-resources-accordion details[open] summary::before { content: "▾ "; }
+    .raumanzeige-resources-accordion .summary-title { flex: 1; }
+    .raumanzeige-resources-accordion .summary-id { color: #646970; font-weight: normal; margin-right: 12px; }
+    .raumanzeige-resources-accordion .summary-actions { display: flex; gap: 8px; }
+    .raumanzeige-resources-accordion .accordion-inner { padding: 16px; border-top: 1px solid #f0f0f1; }
+    .raumanzeige-resources-accordion .form-row { margin-bottom: 16px; }
+    .raumanzeige-resources-accordion .form-row:last-child { margin-bottom: 0; }
+    .raumanzeige-resources-accordion .form-row label { display: block; font-weight: 600; margin-bottom: 4px; }
+    .raumanzeige-resources-accordion .form-row input[type="text"],
+    .raumanzeige-resources-accordion .form-row input[type="url"],
+    .raumanzeige-resources-accordion .form-row input[type="time"],
+    .raumanzeige-resources-accordion .form-row input[type="number"],
+    .raumanzeige-resources-accordion .form-row select { width: 100%; max-width: 600px; }
+    .raumanzeige-resources-accordion .form-row .description { font-size: 13px; color: #646970; margin-top: 4px; }
+    .raumanzeige-resources-accordion .form-row-checkbox { display: flex; align-items: center; gap: 8px; }
+    .raumanzeige-resources-accordion .form-row-checkbox label { font-weight: normal; margin: 0; }
     .raumanzeige-accordion { max-width: 720px; margin: 12px 0; }
     .raumanzeige-accordion details { margin-bottom: 2px; border: 1px solid #c3c4c7; border-radius: 4px; background: #fff; }
     .raumanzeige-accordion details[open] { border-color: #8c8f94; }
@@ -679,69 +686,115 @@ function palestreet_raumanzeige_options_page() {
 
         <form method="post" id="raumanzeige-form">
             <?php wp_nonce_field('palestreet_raumanzeige_options'); ?>
-            <table class="wp-list-table widefat fixed striped raumanzeige-resources-table" style="max-width: 100%; margin-top: 12px;">
-                <thead>
-                    <tr>
-                        <th class="col-id"><?php esc_html_e('ID', 'palestreet-raumanzeige'); ?></th>
-                        <th class="col-name"><?php esc_html_e('Raum / Bezeichnung', 'palestreet-raumanzeige'); ?></th>
-                        <th class="col-ics"><?php esc_html_e('ICS-URL', 'palestreet-raumanzeige'); ?></th>
-                        <th class="col-qr"><?php esc_html_e('QR-Code-URL', 'palestreet-raumanzeige'); ?></th>
-                        <th class="col-wifi"><?php esc_html_e('WLAN (SSID)', 'palestreet-raumanzeige'); ?></th>
-                        <th class="col-wifi-pass"><?php esc_html_e('WLAN-Passwort', 'palestreet-raumanzeige'); ?></th>
-                        <th class="col-tz"><?php esc_html_e('Zeitzone', 'palestreet-raumanzeige'); ?></th>
-                        <th class="col-interval" title="<?php esc_attr_e('Alle X Minuten wird das Schild aktualisiert', 'palestreet-raumanzeige'); ?>"><?php esc_html_e('Update (Min.)', 'palestreet-raumanzeige'); ?></th>
-                        <th class="col-night-from"><?php esc_html_e('Nacht von', 'palestreet-raumanzeige'); ?></th>
-                        <th class="col-night-to"><?php esc_html_e('Nacht bis', 'palestreet-raumanzeige'); ?></th>
-                        <th class="col-template"><?php esc_html_e('Template', 'palestreet-raumanzeige'); ?></th>
-                        <th class="col-debug" title="<?php esc_attr_e('Zeigt Version, IP und Akku auf dem Schild', 'palestreet-raumanzeige'); ?>"><?php esc_html_e('Debug', 'palestreet-raumanzeige'); ?></th>
-                        <th class="col-actions"><?php esc_html_e('Aktionen', 'palestreet-raumanzeige'); ?></th>
-                    </tr>
-                </thead>
-                <tbody id="raumanzeige-rows">
-                    <?php
-                    if (empty($resources)) {
-                        $resources = [['id' => 0, 'name' => '', 'ics_url' => '', 'qr_url' => '', 'wifi_ssid' => '', 'wifi_pass' => '', 'timezone' => '', 'template' => 'default', 'refresh_interval_sec' => 300, 'debug_display' => false, 'night_mode_from' => '', 'night_mode_to' => '']];
-                    }
-                    $next_id = palestreet_raumanzeige_next_id($resources);
-                    foreach ($resources as $idx => $r) :
-                        $rid = isset($r['id']) ? (int) $r['id'] : $idx;
-                        $name = isset($r['name']) ? $r['name'] : '';
-                        $ics = isset($r['ics_url']) ? $r['ics_url'] : '';
-                        $qr = isset($r['qr_url']) ? $r['qr_url'] : '';
-                        $wifi_ssid = isset($r['wifi_ssid']) ? $r['wifi_ssid'] : '';
-                        $wifi_pass = isset($r['wifi_pass']) ? $r['wifi_pass'] : '';
-                        $r_tz = isset($r['timezone']) ? $r['timezone'] : '';
-                        $r_tpl = isset($r['template']) ? $r['template'] : 'default';
-                        $r_refresh_min = isset($r['refresh_interval_sec']) && (int) $r['refresh_interval_sec'] >= 60
-                            ? max(1, min(120, (int) ($r['refresh_interval_sec'] / 60)))
-                            : 5;
-                        $r_debug = !empty($r['debug_display']);
-                        $r_night_from = isset($r['night_mode_from']) ? $r['night_mode_from'] : '';
-                        $r_night_to   = isset($r['night_mode_to']) ? $r['night_mode_to'] : '';
-                    ?>
-                    <tr>
-                        <td class="col-id"><strong><?php echo (int) $rid; ?></strong><input type="hidden" name="resources[<?php echo (int) $idx; ?>][id]" value="<?php echo (int) $rid; ?>" /></td>
-                        <td class="col-name"><input type="text" name="resources[<?php echo (int) $idx; ?>][name]" value="<?php echo esc_attr($name); ?>" class="regular-text" placeholder="<?php esc_attr_e('z.B. Besprechungsraum A', 'palestreet-raumanzeige'); ?>" style="width:100%;" /></td>
-                        <td class="col-ics"><input type="url" name="resources[<?php echo (int) $idx; ?>][ics_url]" value="<?php echo esc_attr($ics); ?>" class="large-text" placeholder="https://..." style="width:100%;" /></td>
-                        <td class="col-qr"><input type="url" name="resources[<?php echo (int) $idx; ?>][qr_url]" value="<?php echo esc_attr($qr); ?>" class="large-text" placeholder="https://..." style="width:100%;" /></td>
-                        <td class="col-wifi"><input type="text" name="resources[<?php echo (int) $idx; ?>][wifi_ssid]" value="<?php echo esc_attr($wifi_ssid); ?>" class="regular-text" placeholder="SSID" style="width:100%;" autocomplete="off" /></td>
-                        <td class="col-wifi-pass"><input type="text" name="resources[<?php echo (int) $idx; ?>][wifi_pass]" value="<?php echo esc_attr($wifi_pass); ?>" class="regular-text" placeholder="***" style="width:100%;" autocomplete="new-password" /></td>
-                        <td class="col-tz"><input type="text" name="resources[<?php echo (int) $idx; ?>][timezone]" value="<?php echo esc_attr($r_tz); ?>" class="regular-text" placeholder="Europe/Berlin" style="width:100%;" /></td>
-                        <td class="col-interval"><input type="number" name="resources[<?php echo (int) $idx; ?>][refresh_interval_min]" value="<?php echo (int) $r_refresh_min; ?>" min="1" max="120" step="1" style="width:60px;" title="<?php esc_attr_e('Minuten', 'palestreet-raumanzeige'); ?>" /></td>
-                        <td class="col-night-from"><input type="time" name="resources[<?php echo (int) $idx; ?>][night_mode_from]" value="<?php echo esc_attr($r_night_from); ?>" style="width:100%;" /></td>
-                        <td class="col-night-to"><input type="time" name="resources[<?php echo (int) $idx; ?>][night_mode_to]" value="<?php echo esc_attr($r_night_to); ?>" style="width:100%;" /></td>
-                        <td class="col-template"><select name="resources[<?php echo (int) $idx; ?>][template]"><option value="default" <?php selected($r_tpl, 'default'); ?>><?php esc_html_e('Raum', 'palestreet-raumanzeige'); ?></option></select></td>
-                        <td class="col-debug"><input type="checkbox" name="resources[<?php echo (int) $idx; ?>][debug_display]" value="1" <?php checked($r_debug); ?> title="<?php esc_attr_e('Debug auf Schild (Version, IP, Akku)', 'palestreet-raumanzeige'); ?>" /></td>
-                        <td class="col-actions">
-                            <a href="<?php echo esc_url($preview_base_url . '?device_id=' . $rid); ?>" target="_blank" rel="noopener" class="button button-small"><?php esc_html_e('Vorschau', 'palestreet-raumanzeige'); ?></a>
-                            <button type="button" class="button button-small raumanzeige-delete-row" aria-label="<?php esc_attr_e('Raum löschen', 'palestreet-raumanzeige'); ?>"><?php esc_html_e('Löschen', 'palestreet-raumanzeige'); ?></button>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+            <div class="raumanzeige-resources-accordion" id="raumanzeige-rows">
+                <?php
+                if (empty($resources)) {
+                    $resources = [['id' => 0, 'name' => '', 'ics_url' => '', 'qr_url' => '', 'wifi_ssid' => '', 'wifi_pass' => '', 'timezone' => '', 'template' => 'default', 'refresh_interval_sec' => 300, 'debug_display' => false, 'night_mode_from' => '', 'night_mode_to' => '']];
+                }
+                $next_id = palestreet_raumanzeige_next_id($resources);
+                foreach ($resources as $idx => $r) :
+                    $rid = isset($r['id']) ? (int) $r['id'] : $idx;
+                    $name = isset($r['name']) ? $r['name'] : '';
+                    $ics = isset($r['ics_url']) ? $r['ics_url'] : '';
+                    $qr = isset($r['qr_url']) ? $r['qr_url'] : '';
+                    $wifi_ssid = isset($r['wifi_ssid']) ? $r['wifi_ssid'] : '';
+                    $wifi_pass = isset($r['wifi_pass']) ? $r['wifi_pass'] : '';
+                    $r_tz = isset($r['timezone']) ? $r['timezone'] : '';
+                    $r_tpl = isset($r['template']) ? $r['template'] : 'default';
+                    $r_refresh_min = isset($r['refresh_interval_sec']) && (int) $r['refresh_interval_sec'] >= 60
+                        ? max(1, min(120, (int) ($r['refresh_interval_sec'] / 60)))
+                        : 5;
+                    $r_debug = !empty($r['debug_display']);
+                    $r_night_from = isset($r['night_mode_from']) ? $r['night_mode_from'] : '';
+                    $r_night_to   = isset($r['night_mode_to']) ? $r['night_mode_to'] : '';
+                    $display_name = $name !== '' ? esc_html($name) : __('Neues Schild', 'palestreet-raumanzeige');
+                ?>
+                <details data-resource-index="<?php echo (int) $idx; ?>">
+                    <summary>
+                        <span class="summary-title">
+                            <span class="summary-id"><?php echo sprintf(__('ID: %d', 'palestreet-raumanzeige'), (int) $rid); ?></span>
+                            <?php echo $display_name; ?>
+                        </span>
+                        <span class="summary-actions">
+                            <a href="<?php echo esc_url($preview_base_url . '?device_id=' . $rid); ?>" target="_blank" rel="noopener" class="button button-small" onclick="event.stopPropagation();"><?php esc_html_e('Vorschau', 'palestreet-raumanzeige'); ?></a>
+                            <button type="button" class="button button-small raumanzeige-delete-row" aria-label="<?php esc_attr_e('Schild löschen', 'palestreet-raumanzeige'); ?>" onclick="event.stopPropagation();"><?php esc_html_e('Löschen', 'palestreet-raumanzeige'); ?></button>
+                        </span>
+                    </summary>
+                    <div class="accordion-inner">
+                        <input type="hidden" name="resources[<?php echo (int) $idx; ?>][id]" value="<?php echo (int) $rid; ?>" />
+                        
+                        <div class="form-row">
+                            <label for="resource-<?php echo (int) $idx; ?>-name"><?php esc_html_e('Raum / Bezeichnung', 'palestreet-raumanzeige'); ?></label>
+                            <input type="text" id="resource-<?php echo (int) $idx; ?>-name" name="resources[<?php echo (int) $idx; ?>][name]" value="<?php echo esc_attr($name); ?>" class="regular-text" placeholder="<?php esc_attr_e('z.B. Besprechungsraum A', 'palestreet-raumanzeige'); ?>" />
+                        </div>
+
+                        <div class="form-row">
+                            <label for="resource-<?php echo (int) $idx; ?>-ics"><?php esc_html_e('ICS-URL', 'palestreet-raumanzeige'); ?></label>
+                            <input type="url" id="resource-<?php echo (int) $idx; ?>-ics" name="resources[<?php echo (int) $idx; ?>][ics_url]" value="<?php echo esc_attr($ics); ?>" class="large-text" placeholder="https://calendar.google.com/calendar/ical/..." />
+                            <p class="description"><?php esc_html_e('Öffentlich abrufbare ICS-Kalender-URL (z. B. Google Kalender „Geheime Adresse iCal“)', 'palestreet-raumanzeige'); ?></p>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="resource-<?php echo (int) $idx; ?>-qr"><?php esc_html_e('QR-Code-URL', 'palestreet-raumanzeige'); ?></label>
+                            <input type="url" id="resource-<?php echo (int) $idx; ?>-qr" name="resources[<?php echo (int) $idx; ?>][qr_url]" value="<?php echo esc_attr($qr); ?>" class="large-text" placeholder="https://..." />
+                            <p class="description"><?php esc_html_e('Optional: URL für QR-Code auf dem Display', 'palestreet-raumanzeige'); ?></p>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="resource-<?php echo (int) $idx; ?>-wifi-ssid"><?php esc_html_e('WLAN (SSID)', 'palestreet-raumanzeige'); ?></label>
+                            <input type="text" id="resource-<?php echo (int) $idx; ?>-wifi-ssid" name="resources[<?php echo (int) $idx; ?>][wifi_ssid]" value="<?php echo esc_attr($wifi_ssid); ?>" class="regular-text" placeholder="SSID" autocomplete="off" />
+                        </div>
+
+                        <div class="form-row">
+                            <label for="resource-<?php echo (int) $idx; ?>-wifi-pass"><?php esc_html_e('WLAN-Passwort', 'palestreet-raumanzeige'); ?></label>
+                            <input type="text" id="resource-<?php echo (int) $idx; ?>-wifi-pass" name="resources[<?php echo (int) $idx; ?>][wifi_pass]" value="<?php echo esc_attr($wifi_pass); ?>" class="regular-text" placeholder="***" autocomplete="new-password" />
+                        </div>
+
+                        <div class="form-row">
+                            <label for="resource-<?php echo (int) $idx; ?>-timezone"><?php esc_html_e('Zeitzone', 'palestreet-raumanzeige'); ?></label>
+                            <input type="text" id="resource-<?php echo (int) $idx; ?>-timezone" name="resources[<?php echo (int) $idx; ?>][timezone]" value="<?php echo esc_attr($r_tz); ?>" class="regular-text" placeholder="Europe/Berlin" />
+                            <p class="description"><?php esc_html_e('Zeitzone für Kalender-Termine (z. B. Europe/Berlin, America/New_York)', 'palestreet-raumanzeige'); ?></p>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="resource-<?php echo (int) $idx; ?>-interval"><?php esc_html_e('Update-Intervall (Minuten)', 'palestreet-raumanzeige'); ?></label>
+                            <input type="number" id="resource-<?php echo (int) $idx; ?>-interval" name="resources[<?php echo (int) $idx; ?>][refresh_interval_min]" value="<?php echo (int) $r_refresh_min; ?>" min="1" max="120" step="1" style="width:100px;" />
+                            <p class="description"><?php esc_html_e('Alle X Minuten wird das Schild aktualisiert', 'palestreet-raumanzeige'); ?></p>
+                        </div>
+
+                        <div class="form-row">
+                            <label><?php esc_html_e('Nachtmodus', 'palestreet-raumanzeige'); ?></label>
+                            <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+                                <div>
+                                    <label for="resource-<?php echo (int) $idx; ?>-night-from" style="font-weight: normal; margin-bottom: 4px; display: block;"><?php esc_html_e('Von', 'palestreet-raumanzeige'); ?></label>
+                                    <input type="time" id="resource-<?php echo (int) $idx; ?>-night-from" name="resources[<?php echo (int) $idx; ?>][night_mode_from]" value="<?php echo esc_attr($r_night_from); ?>" />
+                                </div>
+                                <div>
+                                    <label for="resource-<?php echo (int) $idx; ?>-night-to" style="font-weight: normal; margin-bottom: 4px; display: block;"><?php esc_html_e('Bis', 'palestreet-raumanzeige'); ?></label>
+                                    <input type="time" id="resource-<?php echo (int) $idx; ?>-night-to" name="resources[<?php echo (int) $idx; ?>][night_mode_to]" value="<?php echo esc_attr($r_night_to); ?>" />
+                                </div>
+                            </div>
+                            <p class="description"><?php esc_html_e('In diesem Zeitfenster wird das Update-Intervall verdoppelt (spart Akku)', 'palestreet-raumanzeige'); ?></p>
+                        </div>
+
+                        <div class="form-row">
+                            <label for="resource-<?php echo (int) $idx; ?>-template"><?php esc_html_e('Template', 'palestreet-raumanzeige'); ?></label>
+                            <select id="resource-<?php echo (int) $idx; ?>-template" name="resources[<?php echo (int) $idx; ?>][template]">
+                                <option value="default" <?php selected($r_tpl, 'default'); ?>><?php esc_html_e('Raum', 'palestreet-raumanzeige'); ?></option>
+                            </select>
+                        </div>
+
+                        <div class="form-row form-row-checkbox">
+                            <input type="checkbox" id="resource-<?php echo (int) $idx; ?>-debug" name="resources[<?php echo (int) $idx; ?>][debug_display]" value="1" <?php checked($r_debug); ?> />
+                            <label for="resource-<?php echo (int) $idx; ?>-debug"><?php esc_html_e('Debug-Anzeige aktivieren', 'palestreet-raumanzeige'); ?></label>
+                            <p class="description" style="margin-left: 0;"><?php esc_html_e('Zeigt Version, IP, Raum-ID und Akku % auf dem Schild', 'palestreet-raumanzeige'); ?></p>
+                        </div>
+                    </div>
+                </details>
+                <?php endforeach; ?>
+            </div>
             <p>
-                <button type="button" class="button" id="raumanzeige-add-row"><?php esc_html_e('+ Zeile hinzufügen', 'palestreet-raumanzeige'); ?></button>
+                <button type="button" class="button" id="raumanzeige-add-row"><?php esc_html_e('+ Schild hinzufügen', 'palestreet-raumanzeige'); ?></button>
             </p>
 
             <p class="submit">
@@ -772,7 +825,7 @@ function palestreet_raumanzeige_options_page() {
                 <summary><?php esc_html_e('Hardware', 'palestreet-raumanzeige'); ?></summary>
                 <div class="accordion-inner">
                     <p><strong><?php esc_html_e('Display:', 'palestreet-raumanzeige'); ?></strong> <a href="https://www.seeedstudio.com/reTerminal-E1001-p-6534.html?sensecap_affiliate=VcrMFpJ&referring_service=link" target="_blank" rel="noopener noreferrer">reTerminal E1001 bei Seeed Studio</a></p>
-                    <p><strong><?php esc_html_e('Zubehör Festverkabelung Stromversorgung:', 'palestreet-raumanzeige'); ?></strong> <a href="https://amzn.to/4tcCDFr" target="_blank" rel="noopener noreferrer">Amazon</a></p>
+                    <p><strong><?php esc_html_e('Zubehör Festverkabelung Stromversorgung:', 'palestreet-raumanzeige'); ?></strong> <a href="https://amzn.to/3Onrnps" target="_blank" rel="noopener noreferrer">Amazon</a></p>
                 </div>
             </details>
             <details>
@@ -856,10 +909,10 @@ function palestreet_raumanzeige_options_page() {
     </div>
     <script>
     (function() {
-        var tbody = document.getElementById('raumanzeige-rows');
+        var container = document.getElementById('raumanzeige-rows');
         function getNextFormIndex() {
             var max = -1;
-            tbody.querySelectorAll('input[name^="resources["]').forEach(function(inp) {
+            container.querySelectorAll('input[name^="resources["]').forEach(function(inp) {
                 var m = inp.name.match(/resources\[(\d+)\]/);
                 if (m) max = Math.max(max, parseInt(m[1], 10));
             });
@@ -867,49 +920,135 @@ function palestreet_raumanzeige_options_page() {
         }
         function getNextDeviceId() {
             var max = -1;
-            tbody.querySelectorAll('input[name$="[id]"]').forEach(function(inp) {
+            container.querySelectorAll('input[name$="[id]"]').forEach(function(inp) {
                 var v = parseInt(inp.value, 10);
                 if (!isNaN(v)) max = Math.max(max, v);
             });
             return max + 1;
         }
+        function updateSummaryTitle(details) {
+            var nameInput = details.querySelector('input[name$="[name]"]');
+            var summaryTitle = details.querySelector('.summary-title');
+            if (nameInput && summaryTitle) {
+                var name = nameInput.value.trim();
+                var idSpan = summaryTitle.querySelector('.summary-id');
+                var idText = idSpan ? idSpan.textContent : '';
+                summaryTitle.innerHTML = idText + ' ' + (name || '<?php echo esc_js(__('Neues Schild', 'palestreet-raumanzeige')); ?>');
+            }
+        }
 
         document.getElementById('raumanzeige-add-row').addEventListener('click', function() {
             var formIndex = getNextFormIndex();
             var newId = getNextDeviceId();
-            var tr = document.createElement('tr');
             var previewUrl = '<?php echo esc_js($preview_base_url); ?>?device_id=' + newId;
-            tr.innerHTML = '<td class="col-id"><strong>' + newId + '</strong><input type="hidden" name="resources[' + formIndex + '][id]" value="' + newId + '" /></td>' +
-                '<td class="col-name"><input type="text" name="resources[' + formIndex + '][name]" value="" class="regular-text" placeholder="<?php echo esc_js(__('z.B. Besprechungsraum A', 'palestreet-raumanzeige')); ?>" style="width:100%;" /></td>' +
-                '<td class="col-ics"><input type="url" name="resources[' + formIndex + '][ics_url]" value="" class="large-text" placeholder="https://..." style="width:100%;" /></td>' +
-                '<td class="col-qr"><input type="url" name="resources[' + formIndex + '][qr_url]" value="" class="large-text" placeholder="https://..." style="width:100%;" /></td>' +
-                '<td class="col-wifi"><input type="text" name="resources[' + formIndex + '][wifi_ssid]" value="" class="regular-text" placeholder="SSID" style="width:100%;" autocomplete="off" /></td>' +
-                '<td class="col-wifi-pass"><input type="text" name="resources[' + formIndex + '][wifi_pass]" value="" class="regular-text" placeholder="" style="width:100%;" autocomplete="off" /></td>' +
-                '<td class="col-tz"><input type="text" name="resources[' + formIndex + '][timezone]" value="" class="regular-text" placeholder="Europe/Berlin" style="width:100%;" /></td>' +
-                '<td class="col-interval"><input type="number" name="resources[' + formIndex + '][refresh_interval_min]" value="5" min="1" max="120" step="1" style="width:60px;" title="<?php echo esc_js(__('Minuten', 'palestreet-raumanzeige')); ?>" /></td>' +
-                '<td class="col-night-from"><input type="time" name="resources[' + formIndex + '][night_mode_from]" value="" style="width:100%;" /></td>' +
-                '<td class="col-night-to"><input type="time" name="resources[' + formIndex + '][night_mode_to]" value="" style="width:100%;" /></td>' +
-                '<td class="col-template"><select name="resources[' + formIndex + '][template]"><option value="default"><?php echo esc_js(__('Raum', 'palestreet-raumanzeige')); ?></option></select></td>' +
-                '<td class="col-debug"><input type="checkbox" name="resources[' + formIndex + '][debug_display]" value="1" title="<?php echo esc_js(__('Debug auf Schild (Version, IP, Akku)', 'palestreet-raumanzeige')); ?>" /></td>' +
-                '<td class="col-actions"><a href="' + previewUrl + '" target="_blank" rel="noopener" class="button button-small"><?php echo esc_js(__('Vorschau', 'palestreet-raumanzeige')); ?></a> <button type="button" class="button button-small raumanzeige-delete-row" aria-label="<?php echo esc_js(__('Raum löschen', 'palestreet-raumanzeige')); ?>"><?php echo esc_js(__('Löschen', 'palestreet-raumanzeige')); ?></button></td>';
-            tbody.appendChild(tr);
+            var details = document.createElement('details');
+            details.setAttribute('data-resource-index', formIndex);
+            details.innerHTML = '<summary>' +
+                '<span class="summary-title">' +
+                '<span class="summary-id">ID: ' + newId + '</span> ' +
+                '<?php echo esc_js(__('Neues Schild', 'palestreet-raumanzeige')); ?>' +
+                '</span>' +
+                '<span class="summary-actions">' +
+                '<a href="' + previewUrl + '" target="_blank" rel="noopener" class="button button-small" onclick="event.stopPropagation();"><?php echo esc_js(__('Vorschau', 'palestreet-raumanzeige')); ?></a> ' +
+                '<button type="button" class="button button-small raumanzeige-delete-row" aria-label="<?php echo esc_js(__('Schild löschen', 'palestreet-raumanzeige')); ?>" onclick="event.stopPropagation();"><?php echo esc_js(__('Löschen', 'palestreet-raumanzeige')); ?></button>' +
+                '</span>' +
+                '</summary>' +
+                '<div class="accordion-inner">' +
+                '<input type="hidden" name="resources[' + formIndex + '][id]" value="' + newId + '" />' +
+                '<div class="form-row">' +
+                '<label for="resource-' + formIndex + '-name"><?php echo esc_js(__('Raum / Bezeichnung', 'palestreet-raumanzeige')); ?></label>' +
+                '<input type="text" id="resource-' + formIndex + '-name" name="resources[' + formIndex + '][name]" value="" class="regular-text" placeholder="<?php echo esc_js(__('z.B. Besprechungsraum A', 'palestreet-raumanzeige')); ?>" />' +
+                '</div>' +
+                '<div class="form-row">' +
+                '<label for="resource-' + formIndex + '-ics"><?php echo esc_js(__('ICS-URL', 'palestreet-raumanzeige')); ?></label>' +
+                '<input type="url" id="resource-' + formIndex + '-ics" name="resources[' + formIndex + '][ics_url]" value="" class="large-text" placeholder="https://calendar.google.com/calendar/ical/..." />' +
+                '<p class="description"><?php echo esc_js(__('Öffentlich abrufbare ICS-Kalender-URL (z. B. Google Kalender „Geheime Adresse iCal")', 'palestreet-raumanzeige')); ?></p>' +
+                '</div>' +
+                '<div class="form-row">' +
+                '<label for="resource-' + formIndex + '-qr"><?php echo esc_js(__('QR-Code-URL', 'palestreet-raumanzeige')); ?></label>' +
+                '<input type="url" id="resource-' + formIndex + '-qr" name="resources[' + formIndex + '][qr_url]" value="" class="large-text" placeholder="https://..." />' +
+                '<p class="description"><?php echo esc_js(__('Optional: URL für QR-Code auf dem Display', 'palestreet-raumanzeige')); ?></p>' +
+                '</div>' +
+                '<div class="form-row">' +
+                '<label for="resource-' + formIndex + '-wifi-ssid"><?php echo esc_js(__('WLAN (SSID)', 'palestreet-raumanzeige')); ?></label>' +
+                '<input type="text" id="resource-' + formIndex + '-wifi-ssid" name="resources[' + formIndex + '][wifi_ssid]" value="" class="regular-text" placeholder="SSID" autocomplete="off" />' +
+                '</div>' +
+                '<div class="form-row">' +
+                '<label for="resource-' + formIndex + '-wifi-pass"><?php echo esc_js(__('WLAN-Passwort', 'palestreet-raumanzeige')); ?></label>' +
+                '<input type="text" id="resource-' + formIndex + '-wifi-pass" name="resources[' + formIndex + '][wifi_pass]" value="" class="regular-text" placeholder="***" autocomplete="new-password" />' +
+                '</div>' +
+                '<div class="form-row">' +
+                '<label for="resource-' + formIndex + '-timezone"><?php echo esc_js(__('Zeitzone', 'palestreet-raumanzeige')); ?></label>' +
+                '<input type="text" id="resource-' + formIndex + '-timezone" name="resources[' + formIndex + '][timezone]" value="" class="regular-text" placeholder="Europe/Berlin" />' +
+                '<p class="description"><?php echo esc_js(__('Zeitzone für Kalender-Termine (z. B. Europe/Berlin, America/New_York)', 'palestreet-raumanzeige')); ?></p>' +
+                '</div>' +
+                '<div class="form-row">' +
+                '<label for="resource-' + formIndex + '-interval"><?php echo esc_js(__('Update-Intervall (Minuten)', 'palestreet-raumanzeige')); ?></label>' +
+                '<input type="number" id="resource-' + formIndex + '-interval" name="resources[' + formIndex + '][refresh_interval_min]" value="5" min="1" max="120" step="1" style="width:100px;" />' +
+                '<p class="description"><?php echo esc_js(__('Alle X Minuten wird das Schild aktualisiert', 'palestreet-raumanzeige')); ?></p>' +
+                '</div>' +
+                '<div class="form-row">' +
+                '<label><?php echo esc_js(__('Nachtmodus', 'palestreet-raumanzeige')); ?></label>' +
+                '<div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">' +
+                '<div>' +
+                '<label for="resource-' + formIndex + '-night-from" style="font-weight: normal; margin-bottom: 4px; display: block;"><?php echo esc_js(__('Von', 'palestreet-raumanzeige')); ?></label>' +
+                '<input type="time" id="resource-' + formIndex + '-night-from" name="resources[' + formIndex + '][night_mode_from]" value="" />' +
+                '</div>' +
+                '<div>' +
+                '<label for="resource-' + formIndex + '-night-to" style="font-weight: normal; margin-bottom: 4px; display: block;"><?php echo esc_js(__('Bis', 'palestreet-raumanzeige')); ?></label>' +
+                '<input type="time" id="resource-' + formIndex + '-night-to" name="resources[' + formIndex + '][night_mode_to]" value="" />' +
+                '</div>' +
+                '</div>' +
+                '<p class="description"><?php echo esc_js(__('In diesem Zeitfenster wird das Update-Intervall verdoppelt (spart Akku)', 'palestreet-raumanzeige')); ?></p>' +
+                '</div>' +
+                '<div class="form-row">' +
+                '<label for="resource-' + formIndex + '-template"><?php echo esc_js(__('Template', 'palestreet-raumanzeige')); ?></label>' +
+                '<select id="resource-' + formIndex + '-template" name="resources[' + formIndex + '][template]">' +
+                '<option value="default"><?php echo esc_js(__('Raum', 'palestreet-raumanzeige')); ?></option>' +
+                '</select>' +
+                '</div>' +
+                '<div class="form-row form-row-checkbox">' +
+                '<input type="checkbox" id="resource-' + formIndex + '-debug" name="resources[' + formIndex + '][debug_display]" value="1" />' +
+                '<label for="resource-' + formIndex + '-debug"><?php echo esc_js(__('Debug-Anzeige aktivieren', 'palestreet-raumanzeige')); ?></label>' +
+                '<p class="description" style="margin-left: 0;"><?php echo esc_js(__('Zeigt Version, IP, Raum-ID und Akku % auf dem Schild', 'palestreet-raumanzeige')); ?></p>' +
+                '</div>' +
+                '</div>';
+            container.appendChild(details);
+            details.open = true;
+            var nameInput = details.querySelector('input[name$="[name]"]');
+            if (nameInput) {
+                nameInput.addEventListener('input', function() { updateSummaryTitle(details); });
+            }
             bindDelete();
         });
 
         function bindDelete() {
-            tbody.querySelectorAll('.raumanzeige-delete-row').forEach(function(btn) {
+            container.querySelectorAll('.raumanzeige-delete-row').forEach(function(btn) {
                 if (btn._bound) return;
                 btn._bound = true;
                 btn.addEventListener('click', function() {
-                    var row = btn.closest('tr');
-                    if (tbody.querySelectorAll('tr').length > 1) {
-                        row.remove();
+                    var details = btn.closest('details');
+                    if (container.querySelectorAll('details').length > 1) {
+                        details.remove();
                     } else {
-                        row.querySelectorAll('input[type="text"], input[type="url"]').forEach(function(inp) { inp.value = ''; });
+                        details.querySelectorAll('input[type="text"], input[type="url"], input[type="time"], input[type="number"]').forEach(function(inp) { 
+                            if (inp.type !== 'hidden') inp.value = ''; 
+                        });
+                        details.querySelectorAll('input[type="checkbox"]').forEach(function(inp) { inp.checked = false; });
+                        updateSummaryTitle(details);
                     }
                 });
             });
         }
+        
+        // Update summary titles when name inputs change
+        container.querySelectorAll('input[name$="[name]"]').forEach(function(inp) {
+            var details = inp.closest('details');
+            if (details) {
+                inp.addEventListener('input', function() { updateSummaryTitle(details); });
+            }
+        });
+        
         bindDelete();
     })();
     </script>

@@ -77,7 +77,7 @@ echo "Flash auf $PORT ..."
 echo ""
 
 cleanup_after_flash() {
-  echo "Aufräumen: Binaries und Build-Cache entfernt (Plugin bleibt schlank)."
+  echo "Aufräumen: Binaries und Build-Cache entfernt."
   rm -f "$BINARIES_DIR/bootloader.bin" "$BINARIES_DIR/partitions.bin" "$BINARIES_DIR/app.bin"
   rm -rf "$SCRIPT_DIR/build_firmware"
   # firmware/.venv nicht löschen (wird für Pillow/Schriften genutzt)

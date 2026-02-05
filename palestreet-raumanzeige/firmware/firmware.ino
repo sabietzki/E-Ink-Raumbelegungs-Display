@@ -5,7 +5,7 @@
  * Update-Intervall: aus WordPress pro Schild (refresh_seconds in API)
  * Firmware wird per Kommandozeile geflasht (flash.sh, esptool), nicht über WordPress.
  */
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "1.0.1"
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -271,13 +271,14 @@ static bool parseJsonBool(const String& body, const char* key, bool& out) {
   if (p < 0) return false;
   p += (int)search.length();
   while (p < (int)body.length() && (body[p] == ' ' || body[p] == '\t')) p++;
-  if (p + 4 <= (int)body.length() && body.substring(p, p + 4) == "true") {
-    out = true;
-    return true;
+  // true/True (JSON/Python-Stil) und false/False
+  if (p + 4 <= (int)body.length()) {
+    String four = body.substring(p, p + 4);
+    if (four == "true" || four == "True") { out = true; return true; }
   }
-  if (p + 5 <= (int)body.length() && body.substring(p, p + 5) == "false") {
-    out = false;
-    return true;
+  if (p + 5 <= (int)body.length()) {
+    String five = body.substring(p, p + 5);
+    if (five == "false" || five == "False") { out = false; return true; }
   }
   return false;
 }
