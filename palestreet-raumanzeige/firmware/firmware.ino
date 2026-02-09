@@ -5,7 +5,7 @@
  * Update-Intervall: aus WordPress pro Schild (refresh_seconds in API)
  * Firmware wird per Kommandozeile geflasht (flash.sh, esptool), nicht über WordPress.
  */
-#define FIRMWARE_VERSION "1.0.1"
+#define FIRMWARE_VERSION "1.0.2"
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -197,6 +197,7 @@ String displayStatusLabel = "";
 String displayStatusUntil = "";
 String displayEventTime[MAX_DISPLAY_EVENTS];
 String displayEventSummary[MAX_DISPLAY_EVENTS];
+bool displayEventIsNextDay[MAX_DISPLAY_EVENTS];
 int numDisplayEvents = 0;
 String displayUpdateLabel = "";
 String displayTime = "";
@@ -370,6 +371,16 @@ static bool fetchDisplay() {
       }
       displayEventSummary[numDisplayEvents] = body.substring(sumStart, sumEnd);
       displayEventSummary[numDisplayEvents].replace("\\/", "/");
+      // Prüfe auf is_next_day Flag
+      displayEventIsNextDay[numDisplayEvents] = false;
+      int nextDayPos = body.indexOf("\"is_next_day\":", sumEnd);
+      if (nextDayPos >= 0 && nextDayPos < (int)body.indexOf("}", sumEnd)) {
+        int valStart = nextDayPos + 14;
+        while (valStart < (int)body.length() && (body[valStart] == ' ' || body[valStart] == '\t')) valStart++;
+        if (valStart < (int)body.length() && body[valStart] == 't') {
+          displayEventIsNextDay[numDisplayEvents] = true;
+        }
+      }
       numDisplayEvents++;
       pos = sumEnd + 1;
     }
@@ -894,20 +905,118 @@ void drawScreen() {
     const int eventYTime = h - EVENT_BOTTOM;
     const int eventYName = eventYTime - 14 - 14 - 5;   // Uhrzeit 5px nach oben
     const int eventXs[3] = { EVENT_X_1, EVENT_X_2, EVENT_X_3 };
+    
+    // Finde das erste Event vom nächsten Tag für Strich und Icon
+    int firstNextDayIdx = -1;
+    for (int i = 0; i < numDisplayEvents && i < 3; i++) {
+      if (displayEventIsNextDay[i]) {
+        firstNextDayIdx = i;
+        break;
+      }
+    }
+    
+    // Zeichne Events
     for (int i = 0; i < numDisplayEvents && i < 3; i++) {
       int colCenter = eventXs[i] + EVENT_COL_WIDTH / 2;
       String timeStr = displayEventTime[i];
       timeStr.replace("\xe2\x80\x93", "-");  // UTF-8 En-Dash -> ASCII Bindestrich (Font nur 7-bit)
+      
+      // Text normal zeichnen (wie die anderen Events)
       display.setFont(&FONT_BOLD_13);   // Uhrzeit: Bold
       display.getTextBounds(timeStr.c_str(), 0, 0, &x1, &y1, &tw, &th);
-      display.setCursor(colCenter - tw / 2, eventYName);
+      int timeX = colCenter - tw / 2;
+      int timeY = eventYName;
+      display.setCursor(timeX, timeY);
       display.print(timeStr.c_str());
+      
       String title = displayEventSummary[i].substring(0, 12);  // API liefert max 12 Zeichen (9+...)
       title.toUpperCase();   // Event-Titel: Regular
       display.setFont(&FONT_MED_13);
       display.getTextBounds(title.c_str(), 0, 0, &x1, &y1, &tw, &th);
-      display.setCursor(colCenter - tw / 2, eventYTime);
+      int titleX = colCenter - tw / 2;
+      int titleY = eventYTime;
+      display.setCursor(titleX, titleY);
       display.print(title.c_str());
+    }
+    
+    // Zeichne vertikalen Strich (2px breit) und Icon zwischen letztem heutigen und erstem morgigen Event
+    if (firstNextDayIdx >= 0) {
+      int iconSize = 30;
+      int iconX, iconY;
+      int lineX, lineTop, lineBottom;
+      
+      if (firstNextDayIdx > 0) {
+        // Strich zwischen Event firstNextDayIdx-1 und firstNextDayIdx
+        int leftEventRight = eventXs[firstNextDayIdx - 1] + EVENT_COL_WIDTH;
+        int rightEventLeft = eventXs[firstNextDayIdx];
+        lineX = (leftEventRight + rightEventLeft) / 2 - 1;  // Mitte zwischen Events, 2px breit
+        lineTop = eventYName - 20;  // Etwas über der Uhrzeit
+        lineBottom = eventYTime + 14;  // Etwas unter dem Titel
+        display.fillRect(lineX, lineTop, 2, lineBottom - lineTop, GxEPD_BLACK);
+        // Icon zentriert über dem Strich, 5px Abstand vom Strich
+        iconX = lineX - iconSize / 2 + 1;
+        iconY = lineTop - iconSize - 5;  // Icon 5px über dem Strich
+      } else {
+        // Erstes Event ist vom nächsten Tag: Strich und Icon weit links am Rand
+        lineX = 10;  // 10px vom linken Rand
+        lineTop = eventYName - 20;  // Gleiche Höhe wie bei Termin 2/3
+        lineBottom = eventYTime + 14;  // Gleiche Höhe wie bei Termin 2/3
+        display.fillRect(lineX, lineTop, 2, lineBottom - lineTop, GxEPD_BLACK);
+        // Icon weit links, zentriert über dem Strich, 5px Abstand vom Strich
+        iconX = lineX - iconSize / 2 + 1;
+        iconY = lineTop - iconSize - 5;  // Icon 5px über dem Strich
+      }
+      
+      // Sicherstellen, dass Icon nicht außerhalb des Bildschirms ist
+      if (iconY < 0) iconY = 5;  // Mindestens 5px vom oberen Rand
+      if (iconX < 0) iconX = 5;
+      if (iconX + iconSize > w) iconX = w - iconSize - 5;
+      
+      bool iconDrawn = false;
+      // Versuche zuerst GFX-Format (eingebettet) - bevorzugt für kleine Icons
+#if defined(ICON_NEXT_DAY_GFX_LEN) && (ICON_NEXT_DAY_GFX_LEN > 0) && defined(ICON_NEXT_DAY_GFX_W) && defined(ICON_NEXT_DAY_GFX_H)
+      if (ICON_NEXT_DAY_GFX_W > 0 && ICON_NEXT_DAY_GFX_H > 0) {
+        display.drawBitmap(iconX, iconY, ICON_NEXT_DAY_GFX, ICON_NEXT_DAY_GFX_W, ICON_NEXT_DAY_GFX_H, GxEPD_BLACK);
+        iconDrawn = true;
+      }
+#endif
+      // Dann BMP aus PROGMEM
+      if (!iconDrawn) {
+#ifdef ICON_NEXT_DAY_BMP_LEN
+        if (ICON_NEXT_DAY_BMP_LEN > 0)
+          iconDrawn = drawBmpFromProgmem(ICON_NEXT_DAY_BMP, ICON_NEXT_DAY_BMP_LEN, iconX, iconY, 50, 50);
+#endif
+      }
+      // Fallback: SPIFFS
+      if (!iconDrawn) {
+        iconDrawn = drawBmpFromSpiffs("/next_day.bmp", iconX, iconY, 50, 50);
+      }
+#if BMP_DEBUG
+      if (!iconDrawn) {
+        Serial1.printf("[next_day] Icon nicht gezeichnet. X=%d Y=%d, GFX_LEN=%d, BMP_LEN=%d\n", 
+          iconX, iconY,
+#if defined(ICON_NEXT_DAY_GFX_LEN)
+          ICON_NEXT_DAY_GFX_LEN,
+#else
+          0,
+#endif
+#ifdef ICON_NEXT_DAY_BMP_LEN
+          ICON_NEXT_DAY_BMP_LEN
+#else
+          0
+#endif
+        );
+        if (lastBmpFailReason.length() > 0) {
+          Serial1.printf("[next_day] Fehler: %s\n", lastBmpFailReason.c_str());
+        }
+      } else {
+        Serial1.printf("[next_day] Icon gezeichnet bei X=%d Y=%d\n", iconX, iconY);
+      }
+#endif
+      if (!iconDrawn) {
+        // Fallback: kleines Icon-Symbol zeichnen falls BMP nicht gefunden
+        display.fillRect(iconX + iconSize/2 - 5, iconY + iconSize/2 - 5, 10, 10, GxEPD_BLACK);
+      }
     }
 
     // ——— Oben rechts: Zeitstempel (von API, nicht im content_hash → löst kein Display-Update aus), darunter „Update alle X Min.“ ———

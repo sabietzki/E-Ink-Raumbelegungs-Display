@@ -3,7 +3,7 @@
  * Plugin Name: E-Ink Raumbelegungsplan
  * Plugin URI: https://github.com/sabietzki/
  * Description: Backend für E-Paper-Raumbelegungsplan-Schilder (z. B. reTerminal E1001). ICS-Kalender-Anbindung, REST API für Displays, pro Schild: Zeitzone, Update-Intervall, Nachtmodus, WLAN. Display aktualisiert nur bei geändertem Inhalt (Hash-Vergleich).
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Lars Sabietzki
  * Author URI: https://sabietzki.de
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('PALESTREET_RAUMANZEIGE_VERSION', '1.0.1');
+define('PALESTREET_RAUMANZEIGE_VERSION', '1.0.2');
 
 require_once plugin_dir_path(__FILE__) . 'includes/class-ics-parser.php';
 
@@ -367,6 +367,23 @@ function palestreet_raumanzeige_get_display_data($device_id, $on_date = null) {
             $next_events[] = $ev;
         }
     }
+    
+    // Wenn aktiviert: Events vom nächsten Tag hinzufügen, wenn weniger als 3 Events heute vorhanden sind
+    $show_next_day = !empty($resource['show_next_day_events']);
+    if ($show_next_day && count($next_events) < 3) {
+        $tomorrow = clone $now;
+        $tomorrow->modify('+1 day');
+        $tomorrow_ymd = $tomorrow->format('Ymd');
+        $tomorrow_events = palestreet_raumanzeige_fetch_ics_events($ics_url, $tomorrow->format('Y-m-d'), $tz);
+        foreach ($tomorrow_events as $ev) {
+            if (count($next_events) >= 3) {
+                break;
+            }
+            $ev['is_next_day'] = true;
+            $next_events[] = $ev;
+        }
+    }
+    
     $next_events = array_slice($next_events, 0, 3);
 
     if ($status['occupied'] && $current_ev) {
@@ -401,8 +418,9 @@ function palestreet_raumanzeige_get_display_data($device_id, $on_date = null) {
     $events_api = [];
     foreach ($next_events as $ev) {
         $events_api[] = [
-            'time'    => sprintf('%02d:%02d-%02d:%02d', $ev['start_hour'], $ev['start_min'], $ev['end_hour'], $ev['end_min']),
-            'summary' => palestreet_raumanzeige_truncate_label($ev['summary'], 12),
+            'time'       => sprintf('%02d:%02d-%02d:%02d', $ev['start_hour'], $ev['start_min'], $ev['end_hour'], $ev['end_min']),
+            'summary'    => palestreet_raumanzeige_truncate_label($ev['summary'], 12),
+            'is_next_day'=> !empty($ev['is_next_day']),
         ];
     }
 
@@ -413,7 +431,8 @@ function palestreet_raumanzeige_get_display_data($device_id, $on_date = null) {
     $hash_payload = $room_name . '|' . $status_label . '|' . $status_until . '|' . ($occupied ? '1' : '0') . '|'
         . $update_interval_label . '|' . $refresh_seconds . '|' . ($debug_flag ? '1' : '0') . '|' . $qr_url . '|';
     foreach ($events_api as $ev) {
-        $hash_payload .= $ev['time'] . '=' . $ev['summary'] . ';';
+        // is_next_day muss im Hash enthalten sein, damit sich der Hash ändert, wenn sich der Tag eines Events ändert
+        $hash_payload .= $ev['time'] . '=' . $ev['summary'] . '=' . (!empty($ev['is_next_day']) ? '1' : '0') . ';';
     }
     $content_hash = substr(hash('md5', $hash_payload), 0, 8);
 
@@ -597,6 +616,7 @@ function palestreet_raumanzeige_options_page() {
             $refresh_interval_min = isset($row['refresh_interval_min']) ? max(1, min(120, (int) $row['refresh_interval_min'])) : 5;
             $refresh_interval_sec = $refresh_interval_min * 60;
             $debug_display = isset($row['debug_display']) && $row['debug_display'];
+            $show_next_day_events = isset($row['show_next_day_events']) && $row['show_next_day_events'];
             $night_mode_from = isset($row['night_mode_from']) ? sanitize_text_field($row['night_mode_from']) : '';
             $night_mode_to   = isset($row['night_mode_to']) ? sanitize_text_field($row['night_mode_to']) : '';
             if ($name === $placeholders['name'] || strlen($name) < 2) {
@@ -625,6 +645,7 @@ function palestreet_raumanzeige_options_page() {
                     'template'            => $template,
                     'refresh_interval_sec'=> $refresh_interval_sec,
                     'debug_display'       => $debug_display,
+                    'show_next_day_events'=> $show_next_day_events,
                     'night_mode_from'     => $night_mode_from,
                     'night_mode_to'       => $night_mode_to,
                 ];
@@ -705,6 +726,7 @@ function palestreet_raumanzeige_options_page() {
                         ? max(1, min(120, (int) ($r['refresh_interval_sec'] / 60)))
                         : 5;
                     $r_debug = !empty($r['debug_display']);
+                    $r_show_next_day = !empty($r['show_next_day_events']);
                     $r_night_from = isset($r['night_mode_from']) ? $r['night_mode_from'] : '';
                     $r_night_to   = isset($r['night_mode_to']) ? $r['night_mode_to'] : '';
                     $display_name = $name !== '' ? esc_html($name) : __('Neues Schild', 'palestreet-raumanzeige');
@@ -785,6 +807,12 @@ function palestreet_raumanzeige_options_page() {
                         </div>
 
                         <div class="form-row form-row-checkbox">
+                            <input type="checkbox" id="resource-<?php echo (int) $idx; ?>-show-next-day" name="resources[<?php echo (int) $idx; ?>][show_next_day_events]" value="1" <?php checked($r_show_next_day); ?> />
+                            <label for="resource-<?php echo (int) $idx; ?>-show-next-day"><?php esc_html_e('Termine vom nächsten Tag anzeigen', 'palestreet-raumanzeige'); ?></label>
+                            <p class="description" style="margin-left: 0;"><?php esc_html_e('Wenn aktiviert, werden Termine vom nächsten Tag ausgegraut angezeigt, wenn heute weniger als 3 Termine vorhanden sind', 'palestreet-raumanzeige'); ?></p>
+                        </div>
+
+                        <div class="form-row form-row-checkbox">
                             <input type="checkbox" id="resource-<?php echo (int) $idx; ?>-debug" name="resources[<?php echo (int) $idx; ?>][debug_display]" value="1" <?php checked($r_debug); ?> />
                             <label for="resource-<?php echo (int) $idx; ?>-debug"><?php esc_html_e('Debug-Anzeige aktivieren', 'palestreet-raumanzeige'); ?></label>
                             <p class="description" style="margin-left: 0;"><?php esc_html_e('Zeigt Version, IP, Raum-ID und Akku % auf dem Schild', 'palestreet-raumanzeige'); ?></p>
@@ -816,7 +844,7 @@ function palestreet_raumanzeige_options_page() {
         <ul style="margin:0.5em 0 0 1.2em; padding:0;">
             <li><strong><?php esc_html_e('Geräte-ID setzen', 'palestreet-raumanzeige'); ?></strong> — <?php esc_html_e('wird beim Build abgefragt.', 'palestreet-raumanzeige'); ?></li>
             <li><strong><?php esc_html_e('Automatischer Flash', 'palestreet-raumanzeige'); ?></strong> — <?php esc_html_e('nach dem Build. Alternativ: ./flash.sh ausführen.', 'palestreet-raumanzeige'); ?></li>
-            <li><strong><?php esc_html_e('Gerät auswählen', 'palestreet-raumanzeige'); ?></strong> — <?php esc_html_e('bei mehreren USB-Ports wird eine Nummer abgefragt.', 'palestreet-raumanzeige'); ?></li>
+            <li><strong><?php esc_html_e('Gerät auswählen', 'palestreet-raumanzeige'); ?></strong> — <?php esc_html_e('bei mehreren USB-Ports wird eine Nummer abgefragt (z. B. /dev/cu.usbserial-10).', 'palestreet-raumanzeige'); ?></li>
         </ul>
         <p class="description"><?php esc_html_e('Befehle kopieren (Strg+A im Kasten) und im entpackten Ordner ausführen.', 'palestreet-raumanzeige'); ?></p>
 
@@ -878,15 +906,15 @@ function palestreet_raumanzeige_options_page() {
                     <p><?php esc_html_e('Bei Problemen zeigt das Schild bis zu drei Symbole:', 'palestreet-raumanzeige'); ?></p>
                     <div class="raumanzeige-error-icons">
                         <figure>
-                            <img src="<?php echo esc_url($icons_base_url . 'no_wifi.png'); ?>" alt="" width="64" height="64" />
+                            <img src="<?php echo esc_url($icons_base_url . 'no_wifi.bmp'); ?>" alt="" width="64" height="64" />
                             <figcaption><strong>WLAN?</strong><br><?php esc_html_e('Keine WLAN-Verbindung.', 'palestreet-raumanzeige'); ?></figcaption>
                         </figure>
                         <figure>
-                            <img src="<?php echo esc_url($icons_base_url . 'low_battery.png'); ?>" alt="" width="64" height="64" />
+                            <img src="<?php echo esc_url($icons_base_url . 'low_battery.bmp'); ?>" alt="" width="64" height="64" />
                             <figcaption><strong>Akku!</strong><br><?php esc_html_e('Akku unter 2 %.', 'palestreet-raumanzeige'); ?></figcaption>
                         </figure>
                         <figure>
-                            <img src="<?php echo esc_url($icons_base_url . 'no_connection.png'); ?>" alt="" width="64" height="64" />
+                            <img src="<?php echo esc_url($icons_base_url . 'no_connection.bmp'); ?>" alt="" width="64" height="64" />
                             <figcaption><strong>Server?</strong><br><?php esc_html_e('Backend nicht erreichbar.', 'palestreet-raumanzeige'); ?></figcaption>
                         </figure>
                     </div>
@@ -1006,6 +1034,11 @@ function palestreet_raumanzeige_options_page() {
                 '<select id="resource-' + formIndex + '-template" name="resources[' + formIndex + '][template]">' +
                 '<option value="default"><?php echo esc_js(__('Raum', 'palestreet-raumanzeige')); ?></option>' +
                 '</select>' +
+                '</div>' +
+                '<div class="form-row form-row-checkbox">' +
+                '<input type="checkbox" id="resource-' + formIndex + '-show-next-day" name="resources[' + formIndex + '][show_next_day_events]" value="1" />' +
+                '<label for="resource-' + formIndex + '-show-next-day"><?php echo esc_js(__('Termine vom nächsten Tag anzeigen', 'palestreet-raumanzeige')); ?></label>' +
+                '<p class="description" style="margin-left: 0;"><?php echo esc_js(__('Wenn aktiviert, werden Termine vom nächsten Tag ausgegraut angezeigt, wenn heute weniger als 3 Termine vorhanden sind', 'palestreet-raumanzeige')); ?></p>' +
                 '</div>' +
                 '<div class="form-row form-row-checkbox">' +
                 '<input type="checkbox" id="resource-' + formIndex + '-debug" name="resources[' + formIndex + '][debug_display]" value="1" />' +

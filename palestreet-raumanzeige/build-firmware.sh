@@ -76,10 +76,10 @@ echo ""
 
 # Fehler-Icons als BMP einbetten (icons_data.h) – nur wenn .bmp in data/ geändert oder .h fehlt
 icons_needed=0
-if [ -f "data/no_wifi.bmp" ] || [ -f "data/low_battery.bmp" ] || [ -f "data/no_connection.bmp" ]; then
+if [ -f "data/no_wifi.bmp" ] || [ -f "data/low_battery.bmp" ] || [ -f "data/no_connection.bmp" ] || [ -f "data/next_day.bmp" ]; then
   if [ ! -f "icons_data.h" ]; then icons_needed=1
   else
-    for bmp in data/no_wifi.bmp data/low_battery.bmp data/no_connection.bmp; do
+    for bmp in data/no_wifi.bmp data/low_battery.bmp data/no_connection.bmp data/next_day.bmp; do
       [ -f "$bmp" ] && [ "$bmp" -nt icons_data.h ] && icons_needed=1 && break
     done
   fi
