@@ -3,7 +3,7 @@
  * Plugin Name: E-Ink Raumbelegungsplan
  * Plugin URI: https://github.com/sabietzki/
  * Description: Backend für E-Paper-Raumbelegungsplan-Schilder (z. B. reTerminal E1001). ICS-Kalender-Anbindung, REST API für Displays, pro Schild: Zeitzone, Update-Intervall, Nachtmodus, WLAN. Display aktualisiert nur bei geändertem Inhalt (Hash-Vergleich).
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: Lars Sabietzki
  * Author URI: https://sabietzki.de
  * License: GPL v2 or later
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('PALESTREET_RAUMANZEIGE_VERSION', '1.0.2');
+define('PALESTREET_RAUMANZEIGE_VERSION', '1.0.3');
 
 require_once plugin_dir_path(__FILE__) . 'includes/class-ics-parser.php';
 
@@ -685,6 +685,7 @@ function palestreet_raumanzeige_options_page() {
     .raumanzeige-resources-accordion .form-row .description { font-size: 13px; color: #646970; margin-top: 4px; }
     .raumanzeige-resources-accordion .form-row-checkbox { display: flex; align-items: center; gap: 8px; }
     .raumanzeige-resources-accordion .form-row-checkbox label { font-weight: normal; margin: 0; }
+    .raumanzeige-next-day-icon { vertical-align: middle; margin-right: 6px; width: 20px; height: 20px; object-fit: contain; }
     .raumanzeige-accordion { max-width: 720px; margin: 12px 0; }
     .raumanzeige-accordion details { margin-bottom: 2px; border: 1px solid #c3c4c7; border-radius: 4px; background: #fff; }
     .raumanzeige-accordion details[open] { border-color: #8c8f94; }
@@ -808,14 +809,14 @@ function palestreet_raumanzeige_options_page() {
 
                         <div class="form-row form-row-checkbox">
                             <input type="checkbox" id="resource-<?php echo (int) $idx; ?>-show-next-day" name="resources[<?php echo (int) $idx; ?>][show_next_day_events]" value="1" <?php checked($r_show_next_day); ?> />
-                            <label for="resource-<?php echo (int) $idx; ?>-show-next-day"><?php esc_html_e('Termine vom nächsten Tag anzeigen', 'palestreet-raumanzeige'); ?></label>
+                            <label for="resource-<?php echo (int) $idx; ?>-show-next-day"><img src="<?php echo esc_url(plugins_url('firmware/data/next_day.bmp', __FILE__)); ?>" alt="" class="raumanzeige-next-day-icon" width="20" height="20" /> <?php esc_html_e('Termine vom nächsten Tag anzeigen', 'palestreet-raumanzeige'); ?></label>
                             <p class="description" style="margin-left: 0;"><?php esc_html_e('Wenn aktiviert, werden Termine vom nächsten Tag ausgegraut angezeigt, wenn heute weniger als 3 Termine vorhanden sind', 'palestreet-raumanzeige'); ?></p>
                         </div>
 
                         <div class="form-row form-row-checkbox">
                             <input type="checkbox" id="resource-<?php echo (int) $idx; ?>-debug" name="resources[<?php echo (int) $idx; ?>][debug_display]" value="1" <?php checked($r_debug); ?> />
                             <label for="resource-<?php echo (int) $idx; ?>-debug"><?php esc_html_e('Debug-Anzeige aktivieren', 'palestreet-raumanzeige'); ?></label>
-                            <p class="description" style="margin-left: 0;"><?php esc_html_e('Zeigt Version, IP, Raum-ID und Akku % auf dem Schild', 'palestreet-raumanzeige'); ?></p>
+                            <p class="description" style="margin-left: 0;"><?php esc_html_e('Zeigt Version, IP, Raum-ID und Akku % auf dem Schild; schaltet die Geräte-LED nur in diesem Modus ein.', 'palestreet-raumanzeige'); ?></p>
                         </div>
                     </div>
                 </details>
@@ -938,6 +939,7 @@ function palestreet_raumanzeige_options_page() {
     <script>
     (function() {
         var container = document.getElementById('raumanzeige-rows');
+        var nextDayIconUrl = '<?php echo esc_js(plugins_url('firmware/data/next_day.bmp', __FILE__)); ?>';
         function getNextFormIndex() {
             var max = -1;
             container.querySelectorAll('input[name^="resources["]').forEach(function(inp) {
@@ -1037,13 +1039,13 @@ function palestreet_raumanzeige_options_page() {
                 '</div>' +
                 '<div class="form-row form-row-checkbox">' +
                 '<input type="checkbox" id="resource-' + formIndex + '-show-next-day" name="resources[' + formIndex + '][show_next_day_events]" value="1" />' +
-                '<label for="resource-' + formIndex + '-show-next-day"><?php echo esc_js(__('Termine vom nächsten Tag anzeigen', 'palestreet-raumanzeige')); ?></label>' +
+                '<label for="resource-' + formIndex + '-show-next-day"><img src="' + nextDayIconUrl + '" alt="" class="raumanzeige-next-day-icon" width="20" height="20" /> <?php echo esc_js(__('Termine vom nächsten Tag anzeigen', 'palestreet-raumanzeige')); ?></label>' +
                 '<p class="description" style="margin-left: 0;"><?php echo esc_js(__('Wenn aktiviert, werden Termine vom nächsten Tag ausgegraut angezeigt, wenn heute weniger als 3 Termine vorhanden sind', 'palestreet-raumanzeige')); ?></p>' +
                 '</div>' +
                 '<div class="form-row form-row-checkbox">' +
                 '<input type="checkbox" id="resource-' + formIndex + '-debug" name="resources[' + formIndex + '][debug_display]" value="1" />' +
                 '<label for="resource-' + formIndex + '-debug"><?php echo esc_js(__('Debug-Anzeige aktivieren', 'palestreet-raumanzeige')); ?></label>' +
-                '<p class="description" style="margin-left: 0;"><?php echo esc_js(__('Zeigt Version, IP, Raum-ID und Akku % auf dem Schild', 'palestreet-raumanzeige')); ?></p>' +
+                '<p class="description" style="margin-left: 0;"><?php echo esc_js(__('Zeigt Version, IP, Raum-ID und Akku % auf dem Schild; schaltet die Geräte-LED nur in diesem Modus ein.', 'palestreet-raumanzeige')); ?></p>' +
                 '</div>' +
                 '</div>';
             container.appendChild(details);

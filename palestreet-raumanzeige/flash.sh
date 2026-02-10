@@ -22,11 +22,14 @@ if [ ! -f "$BINARIES_DIR/bootloader.bin" ] || [ ! -f "$BINARIES_DIR/partitions.b
   exit 1
 fi
 
-# esptool.py mit write_flash funktioniert zuverlässig; esptool (v5) mit write-flash als Alternative
-if command -v esptool.py &>/dev/null; then
-  ESPTOOL=esptool.py
-elif command -v esptool &>/dev/null; then
+# esptool (v5+) mit write-flash – keine Deprecation-Warnung. Fallback: esptool.py mit write_flash
+if command -v esptool &>/dev/null; then
   ESPTOOL=esptool
+  FLASH_CMD="write-flash"
+elif command -v esptool.py &>/dev/null; then
+  ESPTOOL=esptool.py
+  FLASH_CMD="write_flash"
+  echo "Hinweis: 'esptool.py' ist veraltet. Für aktuelle Befehle: pip install -U esptool"
 else
   echo "esptool nicht gefunden. Installieren: pip install esptool  oder  brew install esptool"
   exit 1
@@ -83,26 +86,27 @@ cleanup_after_flash() {
   # firmware/.venv nicht löschen (wird für Pillow/Schriften genutzt)
 }
 
-# Zuerst write_flash (Unterstrich) – entspricht dem manuellen Befehl, der zuverlässig funktioniert
-if $ESPTOOL --chip esp32s3 -p "$PORT" write_flash \
-  0x0 "$BINARIES_DIR/bootloader.bin" \
-  0x8000 "$BINARIES_DIR/partitions.bin" \
-  0x10000 "$BINARIES_DIR/app.bin"; then
-  echo ""
-  echo "Fertig. Gerät startet neu."
-  cleanup_after_flash
-  exit 0
-fi
-
-# Fallback: esptool v5 mit write-flash (Bindestrich)
-if $ESPTOOL write-flash --chip esp32s3 -p "$PORT" \
-  0x0 "$BINARIES_DIR/bootloader.bin" \
-  0x8000 "$BINARIES_DIR/partitions.bin" \
-  0x10000 "$BINARIES_DIR/app.bin" 2>/dev/null; then
-  echo ""
-  echo "Fertig. Gerät startet neu."
-  cleanup_after_flash
-  exit 0
+# esptool: write-flash (v5) oder write_flash (ältere Versionen)
+if [ "$FLASH_CMD" = "write-flash" ]; then
+  if $ESPTOOL --chip esp32s3 -p "$PORT" write-flash \
+    0x0 "$BINARIES_DIR/bootloader.bin" \
+    0x8000 "$BINARIES_DIR/partitions.bin" \
+    0x10000 "$BINARIES_DIR/app.bin"; then
+    echo ""
+    echo "Fertig. Gerät startet neu."
+    cleanup_after_flash
+    exit 0
+  fi
+else
+  if $ESPTOOL --chip esp32s3 -p "$PORT" write_flash \
+    0x0 "$BINARIES_DIR/bootloader.bin" \
+    0x8000 "$BINARIES_DIR/partitions.bin" \
+    0x10000 "$BINARIES_DIR/app.bin"; then
+    echo ""
+    echo "Fertig. Gerät startet neu."
+    cleanup_after_flash
+    exit 0
+  fi
 fi
 
 echo ""

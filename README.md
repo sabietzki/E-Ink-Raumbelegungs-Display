@@ -1,6 +1,6 @@
 # E-Ink Raumanzeige · reTerminal E1001
 
-**Version 1.0.2** · Raumbelegungsplan für das **reTerminal E1001** (7,5″ E-Paper, ESP32-S3). Belegungsstatus und nächste Termine aus **ICS-Kalender** (z. B. Google), Konfiguration über **WordPress**. Display aktualisiert nur bei geändertem Inhalt (Hash-Vergleich) – spart Akku.
+**Version 1.0.3** · Raumbelegungsplan für das **reTerminal E1001** (7,5″ E-Paper, ESP32-S3). Belegungsstatus und nächste Termine aus **ICS-Kalender** (z. B. Google), Konfiguration über **WordPress**. Display aktualisiert nur bei geändertem Inhalt (Hash-Vergleich) – spart Akku.
 
 **Hardware:** [reTerminal E1001 bei Seeed Studio](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html?sensecap_affiliate=VcrMFpJ&referring_service=link) · [Zubehör Festverkabelung Stromversorgung (Amazon)](https://amzn.to/3Onrnps)
 
@@ -118,7 +118,7 @@ Pro Zeile (= ein Schild):
 - **Zeitzone** (z. B. `Europe/Berlin`), **Update-Intervall** (Minuten)
 - **Nacht von/bis** (HH:MM) – in dem Fenster wird das Intervall verdoppelt
 - **Termine vom nächsten Tag anzeigen** – wenn heute weniger als 3 Termine vorhanden sind, werden zusätzlich Termine vom nächsten Tag angezeigt (markiert mit Icon und Strich)
-- **Debug-Anzeige** – auf dem Schild: Version, Hash, IP, Raum-ID, Akku %
+- **Debug-Anzeige** – auf dem Schild: Version, Hash, IP, Raum-ID, Akku %; Geräte-LED nur in diesem Modus an
 
 **Löschen:** Eine Zeile = ein Schild. Die **device_id** (ID-Spalte) bleibt beim Löschen anderer Zeilen erhalten.
 
@@ -132,13 +132,25 @@ Pro Zeile (= ein Schild):
 
 ---
 
+## LEDs am Gerät
+
+- **Grüne Status-LED** – Wird von der Firmware gesteuert (GPIO6). Nur an, wenn **Debug-Anzeige** für dieses Schild aktiviert ist; sonst aus.
+- **Rote Lade-LED** – Wird vom Lade-IC (PMIC) gesteuert, nicht vom ESP32. Leuchtet bei Netzteil/Laden. **Per Software nicht abschaltbar.** Optionen: nur mit Akku betreiben (ohne Kabel), LED abkleben oder per Hardware-Modifikation (z. B. Widerstand ablöten) deaktivieren.
+
+---
+
 ## Lizenz
 
 GPL v2 or later. Siehe [License](https://www.gnu.org/licenses/gpl-2.0.html).
 
 ---
 
-**Version 1.0.2** – für reTerminal E1001 (XIAO ESP32S3). Getestet mit WordPress, ICS (Google Kalender). Für 1.1 sind Erweiterungen geplant.
+**Version 1.0.3** – für reTerminal E1001 (XIAO ESP32S3). Getestet mit WordPress, ICS (Google Kalender). Für 1.1 sind Erweiterungen geplant.
+
+### Änderungen in Version 1.0.3
+
+- **Debug-Anzeige & LED** – Die Option „Debug-Anzeige aktivieren“ steuert neben Version, IP, Raum-ID und Akku % auf dem Schild die **grüne Status-LED** (GPIO6) – nur im Debug-Modus an. Die **rote Lade-LED** wird vom Lade-IC (PMIC) gesteuert und ist per Software nicht abschaltbar.
+- **Flashen** – `flash.sh` nutzt jetzt `esptool` mit `write-flash` (keine Deprecation-Warnung mehr bei aktueller esptool-Installation).
 
 ### Änderungen in Version 1.0.2
 

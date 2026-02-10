@@ -5,7 +5,7 @@
  * Update-Intervall: aus WordPress pro Schild (refresh_seconds in API)
  * Firmware wird per Kommandozeile geflasht (flash.sh, esptool), nicht über WordPress.
  */
-#define FIRMWARE_VERSION "1.0.2"
+#define FIRMWARE_VERSION "1.0.3"
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -137,6 +137,10 @@ bool   flashConfigValid = false;
 #define BUTTON_KEY0   3   // Rechts (grüner Button) = manueller Refresh
 #define BUTTON_KEY1   4
 #define BUTTON_KEY2   5
+
+// reTerminal E Series: Grüne Status-LED (GPIO6, Logik invertiert: LOW = an, HIGH = aus). Nur im Debug-Modus an.
+// Rote Lade-LED: wird vom Lade-IC (PMIC) gesteuert, nicht vom ESP32 – per Software nicht abschaltbar.
+#define LED_PIN       6
 
 // reTerminal E Series: Akku-Spannung (Seeed Wiki – Battery Management System)
 #define BATTERY_ADC_PIN     1   // GPIO1 – geteilte Batteriespannung
@@ -1197,6 +1201,9 @@ void doUpdate(bool forceRefresh) {
     drawScreen();
   }
   display.hibernate();
+  // LED nur im Debug-Modus an (Logik invertiert: LOW = an)
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, showDebugDisplay ? LOW : HIGH);
   // WLAN von API geändert → neu verbinden für nächsten Zyklus
   if (wifiConfigChanged) {
     wifiConfigChanged = false;
@@ -1216,6 +1223,10 @@ void doUpdate(bool forceRefresh) {
 }
 
 void setup() {
+  // LED sofort aus (vor allem anderen), nur bei Debug-Anzeige später an (Logik invertiert: HIGH = aus)
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, HIGH);
+
   Serial1.begin(115200, SERIAL_8N1, SERIAL_RX, SERIAL_TX);
   pinMode(BUTTON_KEY0, INPUT_PULLUP);
   pinMode(BUTTON_KEY1, INPUT_PULLUP);
