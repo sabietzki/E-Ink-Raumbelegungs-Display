@@ -469,6 +469,18 @@ function palestreet_raumanzeige_get_display_data($device_id, $on_date = null) {
     ];
 }
 
+/**
+ * URL für Next-Day-Icon (Web-Vorschau, Shortcode).
+ * Bevorzugt PNG für bessere Browser-Kompatibilität.
+ */
+function palestreet_raumanzeige_next_day_icon_url() {
+    $dir = plugin_dir_path(__FILE__) . 'firmware/data/';
+    if (is_file($dir . 'next_day.png')) {
+        return plugins_url('firmware/data/next_day.png', __FILE__);
+    }
+    return plugins_url('firmware/data/next_day.bmp', __FILE__);
+}
+
 function palestreet_raumanzeige_output_display_page($device_id, $on_date = null) {
     $data = palestreet_raumanzeige_get_display_data($device_id, $on_date);
     if ($data === null) {
@@ -485,6 +497,7 @@ function palestreet_raumanzeige_output_display_page($device_id, $on_date = null)
     $refresh_sec = $data['refresh_seconds'];
     $display_time = isset($data['display_time']) ? $data['display_time'] : '';
     $display_url = home_url('/raumanzeige-display/?device_id=' . (int) $device_id);
+    $next_day_icon_url = palestreet_raumanzeige_next_day_icon_url();
 
     header('Content-Type: text/html; charset=utf-8');
     header('X-Robots-Tag: noindex, nofollow');
@@ -510,69 +523,32 @@ function palestreet_raumanzeige_display_shortcode($atts) {
     $atts = shortcode_atts(['device_id' => 0], $atts, 'palestreet_raumanzeige_display');
     $device_id = (int) $atts['device_id'];
 
-    $resources = palestreet_raumanzeige_get_resources();
-    $resource = null;
-    foreach ($resources as $r) {
-        if ((isset($r['id']) ? (int) $r['id'] : 0) === $device_id) {
-            $resource = $r;
-            break;
-        }
-    }
-    if ($resource === null && !empty($resources)) {
-        $resource = $resources[0];
-    }
-    if ($resource === null) {
+    $data = palestreet_raumanzeige_get_display_data($device_id);
+    if ($data === null) {
         return '<p>' . esc_html__('Keine Ressource für diese device_id.', 'palestreet-raumanzeige') . '</p>';
     }
 
-    $room_name = isset($resource['name']) ? $resource['name'] : '';
-    $ics_url   = isset($resource['ics_url']) ? $resource['ics_url'] : '';
-    $qr_url    = isset($resource['qr_url']) ? $resource['qr_url'] : '';
+    $status_label = $data['status_label'];
+    $status_until = $data['status_until'];
+    $status_class = $data['occupied'] ? 'occupied' : '';
+    $next_events = $data['events'];
+    $update_interval_label = isset($data['update_interval_label']) ? $data['update_interval_label'] : __('Update alle 5 Min.', 'palestreet-raumanzeige');
+    $qr_url = $data['qr_url'];
+    $refresh_sec = $data['refresh_seconds'];
+    $display_time = isset($data['display_time']) ? $data['display_time'] : '';
+    $display_url = home_url('/raumanzeige-display/?device_id=' . (int) $device_id);
+    $next_day_icon_url = palestreet_raumanzeige_next_day_icon_url();
+    $inline = true;
+    $inline_device_id = $device_id;
 
-    $tz = wp_timezone();
-    $events = palestreet_raumanzeige_fetch_ics_events($ics_url, null, $tz);
-    $status = palestreet_raumanzeige_compute_status($events, null, $tz);
-    $now = new DateTime('now', $tz);
-    $now_min = (int) $now->format('G') * 60 + (int) $now->format('i');
-    $next_events = [];
-    foreach ($events as $ev) {
-        $start = $ev['start_hour'] * 60 + $ev['start_min'];
-        if ($start > $now_min) {
-            $next_events[] = $ev;
-        }
+    ob_start();
+    $template = dirname(__FILE__) . '/templates/raum.php';
+    if (is_readable($template)) {
+        include $template;
+    } else {
+        return '<p>' . esc_html__('Template nicht gefunden.', 'palestreet-raumanzeige') . '</p>';
     }
-    $next_events = array_slice($next_events, 0, 5);
-
-    $status_text = $status['occupied']
-        ? __('BESETZT', 'palestreet-raumanzeige') . ' – ' . sprintf(__('bis %02d:%02d', 'palestreet-raumanzeige'), $status['until_h'], $status['until_m'])
-        : __('NICHT BESETZT', 'palestreet-raumanzeige') . ' – ' . sprintf(__('bis %02d:%02d', 'palestreet-raumanzeige'), $status['until_h'], $status['until_m']);
-
-    $refresh_sec = 180;
-    $html = '<div class="palestreet-raumanzeige-display" style="font-family:sans-serif;margin:0;padding:20px;background:#fff;color:#000;font-size:clamp(14px,4vw,22px);">'
-        . '<style>.palestreet-raumanzeige-display .ra-display-room{font-size:1.4em;font-weight:bold;margin-bottom:0.5em;}'
-        . '.palestreet-raumanzeige-display .ra-display-status{font-size:1.6em;font-weight:bold;margin:0.5em 0;}'
-        . '.palestreet-raumanzeige-display .ra-display-status.besetzt{color:#c00;} .palestreet-raumanzeige-display .ra-display-status.frei{color:#080;}'
-        . '.palestreet-raumanzeige-display .ra-display-next{margin-top:1em;} .palestreet-raumanzeige-display .ra-display-next ul{list-style:none;padding:0;margin:0.3em 0;} .palestreet-raumanzeige-display .ra-display-next li{margin:0.3em 0;}'
-        . '.palestreet-raumanzeige-display .ra-display-qr{float:right;margin-left:1em;max-width:120px;height:auto;} @media (max-width:400px){.palestreet-raumanzeige-display .ra-display-qr{float:none;display:block;margin:1em 0;}}</style>';
-
-    $html .= '<div class="ra-display-room">' . esc_html($room_name) . '</div>';
-    $html .= '<div class="ra-display-status ' . ($status['occupied'] ? 'besetzt' : 'frei') . '">' . esc_html($status_text) . '</div>';
-
-    if (!empty($next_events)) {
-        $html .= '<div class="ra-display-next"><h3 style="font-size:1em;margin-bottom:0.3em;">' . esc_html__('Nächste Termine', 'palestreet-raumanzeige') . '</h3><ul>';
-        foreach ($next_events as $ev) {
-            $t = sprintf('%02d:%02d - %02d:%02d', $ev['start_hour'], $ev['start_min'], $ev['end_hour'], $ev['end_min']);
-            $html .= '<li>' . esc_html($t . ' ' . $ev['summary']) . '</li>';
-        }
-        $html .= '</ul></div>';
-    }
-
-    if ($qr_url) {
-        $html .= '<img class="ra-display-qr" src="' . esc_url($qr_url) . '" alt="QR" />';
-    }
-
-    $html .= '<script>setTimeout(function(){location.reload();},' . (int) $refresh_sec . '000);</script></div>';
-    return $html;
+    return ob_get_clean();
 }
 
 /**
