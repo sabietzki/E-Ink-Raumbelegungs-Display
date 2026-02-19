@@ -49,6 +49,7 @@ if ($first_next_day_idx >= 0) {
     .display { width: 800px; height: 480px; background: #fff; color: #000; position: relative; }
     .status-label { position: absolute; left: 35px; width: 590px; top: 136px; font-size: 52px; text-align: center; text-transform: uppercase; font-weight: 700; }
     .status-until { position: absolute; left: 35px; width: 590px; top: 206px; font-size: 52px; text-align: center; text-transform: uppercase; font-weight: 700; }
+    .status-until.empty { display: none; }
     .event { position: absolute; bottom: 25px; font-size: 18px; text-align: center; width: 170px; font-weight: 600; }
     .event-1 { left: 35px; } .event-2 { left: 245px; } .event-3 { left: 455px; }
     .event-time { font-size: 18px; color: #333; font-weight: 700; } .event-name { font-weight: 400; margin-top: 4px; text-transform: uppercase; }
@@ -66,7 +67,7 @@ if ($first_next_day_idx >= 0) {
 <?php endif; ?>
   <div class="display">
     <div id="ra-status-label" class="status-label <?php echo esc_attr($status_class); ?>"><?php echo esc_html($status_label); ?></div>
-    <div id="ra-status-until" class="status-until"><?php echo esc_html($status_until); ?></div>
+    <div id="ra-status-until" class="status-until<?php echo ($status_until === '') ? ' empty' : ''; ?>"><?php echo esc_html($status_until); ?></div>
     <div id="ra-next-day-indicator" class="next-day-indicator <?php echo $first_next_day_idx < 0 ? 'hidden' : ''; ?>" style="<?php echo $first_next_day_idx >= 0 ? 'left: ' . (int) $line_left . 'px;' : ''; ?>"><?php if ($next_day_icon_url) { ?><img class="next-day-icon" src="<?php echo esc_url($next_day_icon_url); ?>" alt="" width="30" height="30" /><?php } ?></div>
     <?php for ($i = 0; $i < 3; $i++) : $ev = isset($next_events[$i]) ? $next_events[$i] : null; ?>
     <div class="event event-<?php echo $i + 1; ?>" data-is-next-day="<?php echo ($ev && !empty($ev['is_next_day'])) ? '1' : '0'; ?>">
@@ -124,7 +125,7 @@ if ($first_next_day_idx >= 0) {
       var sl = document.getElementById('ra-status-label');
       var su = document.getElementById('ra-status-until');
       if (sl) { sl.textContent = d.status_label; sl.classList.toggle('occupied', d.occupied); }
-      if (su) su.textContent = d.status_until;
+      if (su) { su.textContent = d.status_until || ''; su.classList.toggle('empty', !(d.status_until && d.status_until.length > 0)); }
       var dt = document.getElementById('ra-display-time');
       if (dt) dt.textContent = d.display_time || '';
       var lbl = document.getElementById('ra-update-label');

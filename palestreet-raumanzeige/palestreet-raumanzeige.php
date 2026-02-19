@@ -391,8 +391,14 @@ function palestreet_raumanzeige_get_display_data($device_id, $on_date = null) {
         $status_until = sprintf('%02d:%02d-%02d:%02d', $current_ev['start_hour'], $current_ev['start_min'], $current_ev['end_hour'], $current_ev['end_min']);
         $occupied = true;
     } else {
-        $status_label = __('NICHT BESETZT', 'palestreet-raumanzeige');
-        $status_until = sprintf(__('BIS %02d:%02d', 'palestreet-raumanzeige'), $status['until_h'], $status['until_m']);
+        $is_end_of_day = ($status['until_h'] == 23 && $status['until_m'] == 59);
+        if ($is_end_of_day) {
+            $status_label = __('HEUTE KEINE', 'palestreet-raumanzeige');
+            $status_until = __('TERMINE MEHR', 'palestreet-raumanzeige');
+        } else {
+            $status_label = __('KEINE TERMINE', 'palestreet-raumanzeige');
+            $status_until = sprintf(__('BIS %02d:%02d', 'palestreet-raumanzeige'), $status['until_h'], $status['until_m']);
+        }
         $occupied = false;
     }
     // Occupied-Label (Status) in API auf 20 Zeichen: bei mehr als 20 → 17 Zeichen + "..."

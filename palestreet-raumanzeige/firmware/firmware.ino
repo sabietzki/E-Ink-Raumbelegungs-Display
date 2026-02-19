@@ -390,8 +390,7 @@ static bool fetchDisplay() {
     }
   }
 
-  if (displayStatusLabel.length() == 0) displayStatusLabel = "NICHT BESETZT";
-  if (displayStatusUntil.length() == 0) displayStatusUntil = "BIS 23:59";
+  if (displayStatusLabel.length() == 0) displayStatusLabel = "Keine Termine";
   return true;
 }
 
@@ -890,7 +889,7 @@ void drawScreen() {
     // ——— Hauptstatus + BIS/Zeitraum: 26pt, Schwarz (NICHT BESETZT / BESETZT) ———
     display.setTextColor(GxEPD_BLACK);
     display.setFont(&FONT_STATUS);
-    String statusStr = displayStatusLabel.length() > 0 ? displayStatusLabel : "NICHT BESETZT";
+    String statusStr = displayStatusLabel.length() > 0 ? displayStatusLabel : "Keine Termine";
     statusStr.toUpperCase();
     display.getTextBounds(statusStr.c_str(), 0, 0, &x1, &y1, &tw, &th);
     display.setCursor(STATUS_LEFT + (STATUS_WIDTH - tw) / 2, STATUS_TOP - y1);
